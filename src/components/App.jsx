@@ -1,4 +1,4 @@
-import React, { Component } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Searchbar } from './Searchbar/Searchbar';
 import { fetchImages } from 'api/ImgFinderApi';
 import { ImageGallery } from './ImageGallery/ImageGallery';
@@ -9,22 +9,19 @@ import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { toast } from 'react-toastify';
 
-export class App extends Component {
-  state = {
-    query: '',
-    images: [],
-    page: 1,
-    totalHits: 0,
-    isLoading: false,
-  };
+export const App = () => {
+  const [query, setQuery] = useState('');
+  const [images, setImages] = useState([]);
+  const [page, setPage] = useState(1);
+  const [totalHits, setTotalHits] = useState(0);
+  const [isLoading, setLoading] = useState(false);
 
-  async componentDidUpdate(_, prevState) {
-    const { query, page } = this.state;
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!query) return;
 
-    if (prevState.query !== query || prevState.page !== page) {
       try {
-        this.setState({ isLoading: true });
-
+        setLoading(true);
         const { totalHits, hits } = await fetchImages(query, page);
 
         if (totalHits === 0) {
@@ -32,41 +29,40 @@ export class App extends Component {
           return;
         }
 
-        this.setState(prevState => ({
-          images: page === 1 ? hits : [...prevState.images, ...hits],
-
-          totalHits:
-            page === 1
-              ? totalHits - hits.length
-              : totalHits - [...prevState.images, ...hits].length,
-        }));
+        if (page === 1) {
+          setImages(hits);
+          setTotalHits(totalHits - hits.length);
+        } else {
+          setImages(prevImages => [...prevImages, ...hits]);
+          setTotalHits(prevTotalHits => prevTotalHits - hits.length);
+        }
       } catch (error) {
         toast.error(`Oops! Something went wrong! ${error}`);
       } finally {
-        this.setState({ isLoading: false });
+        setLoading(false);
       }
-    }
-  }
+    };
 
-  handleQuerySubmit = query => {
-    this.setState({ query, page: 1 });
+    fetchData();
+  }, [query, page]);
+
+  const handleQuerySubmit = query => {
+    setQuery(query);
+    setPage(1);
   };
 
-  handleLoadMore = () => {
-    this.setState(prevState => ({ page: prevState.page + 1 }));
+  const handleLoadMore = () => {
+    setPage(prevPage => prevPage + 1);
   };
 
-  render() {
-    const { images, totalHits, isLoading } = this.state;
-    return (
-      <>
-        <Searchbar onSubmit={this.handleQuerySubmit}></Searchbar>
-        {images && <ImageGallery images={images}></ImageGallery>}
-        {!!totalHits && <Button onLoadMore={this.handleLoadMore}></Button>}
-        {isLoading && <Loader />}
+  return (
+    <>
+      <Searchbar onSubmit={handleQuerySubmit}></Searchbar>
+      {images && <ImageGallery images={images}></ImageGallery>}
+      {!!totalHits && <Button onLoadMore={handleLoadMore}></Button>}
+      {isLoading && <Loader />}
 
-        <ToastContainer autoClose={2000} />
-      </>
-    );
-  }
-}
+      <ToastContainer autoClose={2000} />
+    </>
+  );
+};
